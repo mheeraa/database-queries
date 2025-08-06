@@ -1,0 +1,155 @@
+CREATE TABLE TEAM
+(
+ROLLNO BIGINT,
+NAME VARCHAR(30),
+HFLAG SMALLINT CHECK (HFLAG IN(0,1)),
+CFLAG SMALLINT CHECK (CFLAG IN(0,1)),
+TFLAG SMALLINT CHECK (HFLAG IN(0,1))
+);
+
+INSERT INTO TEAM VALUES
+(
+24101,'MANJU',0,1,0
+);
+
+INSERT INTO TEAM VALUES
+(
+24102,'JACOB',0,1,0
+);
+
+
+INSERT INTO TEAM VALUES
+(
+24103,'PETER',0,1,1
+);
+
+
+INSERT INTO TEAM VALUES
+(
+24104,'JAMES',0,0,0
+);
+
+INSERT INTO TEAM VALUES
+(
+24105,'PREETHI',0,0,0
+);
+
+INSERT INTO TEAM VALUES
+(
+24106,'DEEPTHI',1,0,0
+);
+
+INSERT INTO TEAM VALUES
+(
+24107,'SOLOMON',0,0,1
+);
+
+
+INSERT INTO TEAM VALUES
+(
+24108,'MATTHEW',1,1,0
+);
+
+INSERT INTO TEAM VALUES
+(
+24109,'DAVID',0,1,1
+);
+
+INSERT INTO TEAM VALUES
+(
+24110,'MARY',1,0,1
+);
+
+List the details of students who are members of at least one team.
+
+SELECT * FROM TEAM
+WHERE CFLAG=1 OR HFLAG=1 OR TFLAG=1;
+
+List the details of students who are members of only one team.
+
+SELECT * FROM TEAM
+WHERE CFLAG=1 AND HFLAG=0 AND TFLAG=0
+UNION
+SELECT * FROM TEAM
+WHERE CFLAG=0 AND HFLAG=1 AND TFLAG=0
+UNION
+SELECT * FROM TEAM
+WHERE CFLAG=0 AND HFLAG=0 AND TFLAG=1;
+
+List the details of students who are members of two teams.
+
+SELECT * FROM TEAM
+WHERE CFLAG=1 AND HFLAG=1 AND TFLAG=0
+UNION
+SELECT * FROM TEAM
+WHERE CFLAG=1 AND HFLAG=0 AND TFLAG=1
+UNION
+SELECT * FROM TEAM
+WHERE CFLAG=0 AND HFLAG=1 AND TFLAG=1;
+
+List the details of students who play only hockey.
+
+SELECT * FROM TEAM
+WHERE HFLAG = 1 AND CFLAG=0 AND TFLAG=0;
+
+List the details of students who play only cricket.
+
+SELECT * FROM TEAM
+WHERE HFLAG = 0 AND CFLAG=1 AND TFLAG=0;
+
+List the details of students who play only Table Tennis.
+
+SELECT * FROM TEAM
+WHERE HFLAG = 0 AND CFLAG=0 AND TFLAG=1;
+
+List the details of students who play Hockey and Cricket.
+
+SELECT * FROM TEAM
+WHERE HFLAG=1 AND CFLAG=1;
+
+List the details of students who play Hockey and Table Tennis.
+
+SELECT * FROM TEAM
+WHERE HFLAG = 1 AND TFLAG=1;
+
+List the details of students who play Cricket and Table Tennis.
+
+SELECT * FROM TEAM
+WHERE CFLAG = 1 AND TFLAG=1;
+
+List the details of students who play Hockey but not Cricket.
+
+SELECT * FROM TEAM
+WHERE HFLAG = 1 AND CFLAG=0;
+
+List the details of students who play Hockey but not Table Tennis.
+
+SELECT * FROM TEAM
+WHERE HFLAG = 1 AND TFLAG=0;
+
+List the number of students who play each game.
+
+SELECT COUNT(*) FROM TEAM 
+WHERE HFLAG=1;
+
+SELECT COUNT(*) FROM TEAM 
+WHERE CFLAG=1;
+
+SELECT COUNT(*) FROM TEAM 
+WHERE TFLAG=1;
+
+SELECT
+(
+SELECT COUNT(*) FROM TEAM 
+WHERE HFLAG=1
+),
+(
+SELECT COUNT(*) FROM TEAM 
+WHERE CFLAG=1
+),
+(
+SELECT COUNT(*) FROM TEAM 
+WHERE TFLAG=1
+);
+
+

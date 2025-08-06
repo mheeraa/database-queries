@@ -1,0 +1,88 @@
+CASSANDRA
+
+cqlsh> CREATE KEYSPACE IF NOT EXISTS medical_camp
+   ... WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+cqlsh> USE medical_camp;
+cqlsh:medical_camp> CREATE TABLE patients (
+                ...   patient_id UUID PRIMARY KEY,
+                ...   name text,
+                ...   age int
+                ... );
+cqlsh:medical_camp> CREATE TABLE appointments (
+                ...   appointment_id UUID PRIMARY KEY,
+                ...   patient_id UUID,
+                ...   diagnosis text
+                ... );
+cqlsh:medical_camp> SELECT * FROM patients;
+
+ patient_id | age | name
+------------+-----+------
+
+(0 rows)
+cqlsh:medical_camp> SELECT * FROM appointments;
+
+ appointment_id | diagnosis | patient_id
+----------------+-----------+------------
+
+(0 rows)
+cqlsh:medical_camp> INSERT INTO patients (patient_id, name, age) VALUES (uuid(), 'Ravi Kumar', 45);
+cqlsh:medical_camp> SELECT * FROM patients;
+
+ patient_id                           | age | name
+--------------------------------------+-----+------------
+ 80035965-a80f-4042-b48a-a0793e7597e3 |  45 | Ravi Kumar
+
+(1 rows)
+cqlsh:medical_camp> INSERT INTO appointments (appointment_id, patient_id, diagnosis) VALUES (uuid(), 80035965-a80f-4042-b48a-a0793e7597e3, 'Flu');
+cqlsh:medical_camp> SELECT * FROM appointments;
+
+ appointment_id                       | diagnosis | patient_id
+--------------------------------------+-----------+--------------------------------------
+ 2ac0b346-92b0-4ccd-8ca2-3e6c80aa5a78 |       Flu | 80035965-a80f-4042-b48a-a0793e7597e3
+
+(1 rows)
+cqlsh:medical_camp> SELECT * FROM appointments WHERE appointment_id = 2ac0b346-92b0-4ccd-8ca2-3e6c80aa5a78;
+
+ appointment_id                       | diagnosis | patient_id
+--------------------------------------+-----------+--------------------------------------
+ 2ac0b346-92b0-4ccd-8ca2-3e6c80aa5a78 |       Flu | 80035965-a80f-4042-b48a-a0793e7597e3
+
+(1 rows)
+cqlsh:medical_camp> UPDATE patients SET age = 46 WHERE patient_id = 80035965-a80f-4042-b48a-a0793e7597e3;
+cqlsh:medical_camp> select * from patients;
+
+ patient_id                           | age | name
+--------------------------------------+-----+------------
+ 80035965-a80f-4042-b48a-a0793e7597e3 |  46 | Ravi Kumar
+
+(1 rows)
+cqlsh:medical_camp> UPDATE appointments SET diagnosis = 'Cold' WHERE appointment_id = 2ac0b346-92b0-4ccd-8ca2-3e6c80aa5a78;
+cqlsh:medical_camp> select * from appointments;
+
+ appointment_id                       | diagnosis | patient_id
+--------------------------------------+-----------+--------------------------------------
+ 2ac0b346-92b0-4ccd-8ca2-3e6c80aa5a78 |      Cold | 80035965-a80f-4042-b48a-a0793e7597e3
+
+(1 rows)
+cqlsh:medical_camp> CREATE MATERIALIZED VIEW appointments_by_patient AS
+                ...   SELECT * FROM appointments
+                ...   WHERE patient_id IS NOT NULL AND appointment_id IS NOT NULL
+                ...   PRIMARY KEY (patient_id, appointment_id);
+
+Warnings :
+Materialized views are experimental and are not recommended for production use.
+cqlsh:medical_camp> SELECT * FROM medical_camp.appointments_by_patient;
+
+ patient_id                           | appointment_id                       | diagnosis
+--------------------------------------+--------------------------------------+-----------
+ 80035965-a80f-4042-b48a-a0793e7597e3 | 2ac0b346-92b0-4ccd-8ca2-3e6c80aa5a78 |      Cold
+
+(1 rows)
+cqlsh:medical_camp> CREATE FUNCTION medical_camp.age_group(age int) RETURNS NULL ON NULL INPUT RETURNS text LANGUAGE java AS 'if (age < 18) return "Child"; else if (age < 60) return "Adult"; else return "Senior";';
+cqlsh:medical_camp> SELECT name, age, medical_camp.age_group(age) AS category FROM medical_camp.patients;
+
+ name       | age | category
+------------+-----+----------
+ Ravi Kumar |  46 |    Adult
+
+(1 rows)

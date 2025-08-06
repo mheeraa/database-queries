@@ -1,0 +1,111 @@
+MONGODB
+
+heeran> db.system.js.updateOne(
+...   { _id: "calculateDiscount" },
+...   {
+...     $set: {
+...       value: function(price, discountPercent) {
+...         return price - (price * discountPercent / 100);
+...       }
+...     }
+...   },
+...   { upsert: true }
+... );
+...
+{
+  acknowledged: true,
+  insertedId: 'calculateDiscount',
+  matchedCount: 0,
+  modifiedCount: 0,
+  upsertedCount: 1
+}
+heeran> const funcDoc = db.system.js.findOne({ _id: "calculateDiscount" });
+... const funcString = funcDoc.value.code;  // <-- get the function code string
+... const calculateDiscount = eval('(' + funcString + ')');
+...
+... print(calculateDiscount(1000, 15));  // Output: 850
+...
+850
+heeran> // Insert student document
+... db.users.insertOne({
+...   name: "Alice",
+...   role: "student",
+...   grade: "10th",
+...   subjects: ["English", "Math"]
+... });
+{
+  acknowledged: true,
+  insertedId: ObjectId('682989ab4bcd42fbfeb71236')
+}
+heeran> db.users.insertOne({
+...   name: "Bob",
+...   role: "teacher",
+...   department: "Science",
+...   subjectsTaught: ["Physics", "Chemistry"]
+... });
+{
+  acknowledged: true,
+  insertedId: ObjectId('682989b74bcd42fbfeb71237')
+}
+heeran> db.users.find({ role: "student" }).pretty();
+[
+  {
+    _id: ObjectId('682989ab4bcd42fbfeb71236'),
+    name: 'Alice',
+    role: 'student',
+    grade: '10th',
+    subjects: [ 'English', 'Math' ]
+  }
+]
+heeran> db.users.find({ role: "teacher", subjectsTaught: "Physics" }).pretty();
+[
+  {
+    _id: ObjectId('682989b74bcd42fbfeb71237'),
+    name: 'Bob',
+    role: 'teacher',
+    department: 'Science',
+    subjectsTaught: [ 'Physics', 'Chemistry' ]
+  }
+]
+heeran> // Insert users with friend relationships
+... db.users.insertMany([
+...   { _id: 1, name: "Alice", friends: [2, 3] },
+...   { _id: 2, name: "Bob", friends: [1, 4] },
+...   { _id: 3, name: "Charlie", friends: [1] },
+...   { _id: 4, name: "David", friends: [2] }
+... ]);
+...
+{ acknowledged: true, insertedIds: { '0': 1, '1': 2, '2': 3, '3': 4 } }
+heeran> db.users.aggregate([
+...   { $match: { name: "Alice" } },
+...   {
+...     $graphLookup: {
+...       from: "users",
+...       startWith: "$friends",
+...       connectFromField: "friends",
+...       connectToField: "_id",
+...       as: "friendsNetwork"
+...     }
+...   }
+... ]).pretty();
+[
+  {
+    _id: ObjectId('682989ab4bcd42fbfeb71236'),
+    name: 'Alice',
+    role: 'student',
+    grade: '10th',
+    subjects: [ 'English', 'Math' ],
+    friendsNetwork: []
+  },
+  {
+    _id: 1,
+    name: 'Alice',
+    friends: [ 2, 3 ],
+    friendsNetwork: [
+      { _id: 3, name: 'Charlie', friends: [ 1 ] },
+      { _id: 4, name: 'David', friends: [ 2 ] },
+      { _id: 1, name: 'Alice', friends: [ 2, 3 ] },
+      { _id: 2, name: 'Bob', friends: [ 1, 4 ] }
+    ]
+  }
+]

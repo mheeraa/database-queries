@@ -1,0 +1,166 @@
+-- create books table
+create table books (
+    book_id number primary key,
+    book_title varchar2(100),
+    author varchar2(100),
+    available_copies number
+);
+
+-- insert some books manually
+insert into books (book_id, book_title, author, available_copies) values 
+(1, 'the catcher in the rye', 'j.d. salinger', 5);
+insert into books (book_id, book_title, author, available_copies) values 
+(2, '1984', 'george orwell', 3);
+insert into books (book_id, book_title, author, available_copies) values 
+(3, 'to kill a mockingbird', 'harper lee', 4);
+insert into books (book_id, book_title, author, available_copies) values 
+(4, 'moby dick', 'herman melville', 2);
+
+-- create borrowers table
+create table borrowers (
+    borrower_id number primary key,
+    name varchar2(100),
+    registration_date timestamp default current_timestamp
+);
+
+-- insert some borrowers manually
+insert into borrowers (borrower_id, name) values 
+(1, 'alice johnson');
+insert into borrowers (borrower_id, name) values
+(2, 'bob smith');
+insert into borrowers (borrower_id, name) values
+(3, 'charlie brown');
+
+-- create borrowed_books table
+create table borrowed_books (
+    borrow_id number primary key,
+    borrower_id number,
+    book_id number,
+    borrow_date timestamp default current_timestamp,
+    return_date timestamp,
+    last_borrowed timestamp default current_timestamp,
+    constraint fk_borrower foreign key (borrower_id) references borrowers(borrower_id),
+    constraint fk_book foreign key (book_id) references books(book_id)
+);
+
+-- create function to calculate the total number of books borrowed by a borrower
+create or replace function total_books_borrowed(borrower in number) 
+return number 
+is
+    total_books number;
+begin
+    select count(*) into total_books
+    from borrowed_books
+    where borrower_id = borrower and return_date is null;
+    return total_books;
+end;
+/
+
+-- create procedure to add a new borrower
+create or replace procedure add_borrower(
+    p_borrower_id in number,
+    p_name in varchar2
+)
+is
+begin
+    insert into borrowers (borrower_id, name)
+    values (p_borrower_id, p_name);
+end;
+/
+
+-- create trigger to update last_borrowed when a new row is inserted into borrowed_books
+create or replace trigger update_last_borrowed
+after insert on borrowed_books
+for each row
+begin
+    update borrowed_books
+    set last_borrowed = current_timestamp
+    where borrow_id = :new.borrow_id;
+    update books
+    set available_copies = available_copies - 1
+    where book_id = :new.book_id;
+end;
+/
+
+-- test the procedure by adding a new borrower
+exec add_borrower(4, 'david lee');
+
+-- test the function by calculating the number of books borrowed by alice (borrower_id 1)
+select total_books_borrowed(1) from dual;
+
+-- simulate borrowing a book: alice borrows 'the catcher in the rye'
+insert into borrowed_books (borrower_id, book_id) values (1, 1);
+
+-- check the data in borrowed_books table
+select * from borrowed_books;
+
+-- check the updated books table to see the available copies
+select * from books;
+
+OUTPUT
+
+TOTAL_BOOKS_BORROWED(1)
+-----------------------
+		      0
+insert into borrowed_books (borrower_id, book_id) values (1, 1)
+*
+ERROR at line 1:
+ORA-01400: cannot insert NULL into
+("C##4352MSVBH_435EXFDMG"."BORROWED_BOOKS"."BORROW_ID")
+
+
+
+   BOOK_ID
+----------
+BOOK_TITLE
+--------------------------------------------------------------------------------
+AUTHOR
+--------------------------------------------------------------------------------
+AVAILABLE_COPIES
+----------------
+	 1
+the catcher in the rye
+j.d. salinger
+	       5
+
+
+   BOOK_ID
+----------
+BOOK_TITLE
+--------------------------------------------------------------------------------
+AUTHOR
+--------------------------------------------------------------------------------
+AVAILABLE_COPIES
+----------------
+	 2
+1984
+george orwell
+	       3
+
+
+   BOOK_ID
+----------
+BOOK_TITLE
+--------------------------------------------------------------------------------
+AUTHOR
+--------------------------------------------------------------------------------
+AVAILABLE_COPIES
+----------------
+	 3
+to kill a mockingbird
+harper lee
+	       4
+
+
+   BOOK_ID
+----------
+BOOK_TITLE
+--------------------------------------------------------------------------------
+AUTHOR
+--------------------------------------------------------------------------------
+AVAILABLE_COPIES
+----------------
+	 4
+moby *****
+herman melville
+	       2

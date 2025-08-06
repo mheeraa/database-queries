@@ -1,0 +1,205 @@
+-- create the database for the library system
+create database library;
+
+-- connect to the database
+\c library;
+
+-- create books table to store information about books
+create table books (
+    book_id serial primary key,
+    book_title varchar(100),
+    author varchar(100),
+    available_copies int
+);
+
+-- insert some books into the books table (manually inserting primary keys)
+insert into books (book_id, book_title, author, available_copies) values
+    (1, 'the catcher in the rye', 'j.d. salinger', 5),
+    (2, '1984', 'george orwell', 3),
+    (3, 'to kill a mockingbird', 'harper lee', 4),
+    (4, 'moby dick', 'herman melville', 2);
+
+-- create borrowers table to track people who borrow books
+create table borrowers (
+    borrower_id serial primary key,
+    name varchar(100),
+    registration_date timestamp default current_timestamp
+);
+
+-- insert some borrowers manually (using primary key data)
+insert into borrowers (borrower_id, name) values
+    (1, 'alice johnson'),
+    (2, 'bob smith'),
+    (3, 'charlie brown');
+
+-- create borrowed_books table to store which books were borrowed by which borrowers
+create table borrowed_books (
+    borrow_id serial primary key,
+    borrower_id int references borrowers(borrower_id),
+    book_id int references books(book_id),
+    borrow_date timestamp default current_timestamp,
+    return_date timestamp,
+    last_borrowed timestamp default current_timestamp
+);
+
+-- create a function to calculate the total number of books borrowed by a borrower
+create or replace function total_books_borrowed(borrower int)
+returns int as
+$$
+declare
+    total_books int;
+begin
+    select count(*) into total_books
+    from borrowed_books
+    where borrower_id = borrower and return_date is null;
+    return total_books;
+end;
+$$
+language plpgsql;
+
+-- create a procedure to add a new borrower
+create or replace procedure add_borrower(
+    p_borrower_id int,
+    p_name varchar(100)
+)
+language plpgsql
+as $$
+begin
+    insert into borrowers (borrower_id, name)
+    values (p_borrower_id, p_name);
+end;
+$$;
+
+-- create a trigger function to update the last_borrowed timestamp whenever a book is borrowed
+create or replace function update_last_borrowed()
+returns trigger as
+$$
+begin
+    new.last_borrowed = current_timestamp;
+    update books
+    set available_copies = available_copies - 1
+    where book_id = new.book_id;
+    return new;
+end;
+$$
+language plpgsql;
+
+-- create a trigger to update last_borrowed when a new row is inserted into borrowed_books
+create trigger last_borrowed_trigger
+after insert on borrowed_books
+for each row
+execute function update_last_borrowed();
+
+-- test the procedure by adding a new borrower
+call add_borrower('david lee');
+
+-- test the function by calculating the number of books borrowed by alice (borrower_id 1)
+select total_books_borrowed(1);
+
+-- test the trigger: simulate borrowing a book
+insert into borrowed_books (borrower_id, book_id)
+values (1, 1);  -- alice borrows 'the catcher in the rye'
+
+-- check the data in borrowed_books table
+select * from borrowed_books;
+
+-- check the updated books table to see the available copies
+select * from books;
+
+-- statement level trigger
+create or replace function update_books_after_insert()
+returns trigger as
+$$
+declare
+begin
+    -- update available copies for the books borrowed in this insert statement
+    update books
+    set available_copies = available_copies - (select count(*) 
+                                                from borrowed_books 
+                                                where borrowed_books.book_id = books.book_id 
+                                                and borrowed_books.return_date is null)
+    where book_id in (select distinct book_id from borrowed_books where return_date is null);
+    return null;  -- No need to return any row as it's a statement-level trigger
+end;
+$$
+language plpgsql;
+
+create trigger update_books_after_borrow
+after insert on borrowed_books
+for statement
+execute function update_books_after_insert();
+
+-- simulate borrowing multiple books
+insert into borrowed_books (borrower_id, book_id)
+values (2, 2), (3, 3);  -- bob borrows '1984' and charlie borrows 'to kill a mockingbird'
+
+-- check the updated books table to see the available copies
+select * from books;
+
+OUTPUT
+
+library=# \d books;
+                                           Table "public.books"
+      Column      |          Type          | Collation | Nullable |                Default
+------------------+------------------------+-----------+----------+----------------------------------------
+ book_id          | integer                |           | not null | nextval('books_book_id_seq'::regclass)
+ book_title       | character varying(100) |           |          |
+ author           | character varying(100) |           |          |
+ available_copies | integer                |           |          |
+Indexes:
+    "books_pkey" PRIMARY KEY, btree (book_id)
+Referenced by:
+    TABLE "borrowed_books" CONSTRAINT "borrowed_books_book_id_fkey" FOREIGN KEY (book_id) REFERENCES books(book_id)
+
+library=# select * from books;
+ book_id |       book_title       |     author      | available_copies
+---------+------------------------+-----------------+------------------
+       2 | 1984                   | george orwell   |                3
+       3 | to kill a mockingbird  | harper lee      |                4
+       4 | moby dick              | herman melville |                2
+       1 | the catcher in the rye | j.d. salinger   |                4
+(4 rows)
+
+library=# \d borrowers;
+                                                Table "public.borrowers"
+      Column       |            Type             | Collation | Nullable |                    Default
+-------------------+-----------------------------+-----------+----------+------------------------------------------------
+ borrower_id       | integer                     |           | not null | nextval('borrowers_borrower_id_seq'::regclass)
+ name              | character varying(100)      |           |          |
+ registration_date | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+Indexes:
+    "borrowers_pkey" PRIMARY KEY, btree (borrower_id)
+Referenced by:
+    TABLE "borrowed_books" CONSTRAINT "borrowed_books_borrower_id_fkey" FOREIGN KEY (borrower_id) REFERENCES borrowers(borrower_id)
+
+library=# select * from borrowers;
+ borrower_id |     name      |     registration_date
+-------------+---------------+----------------------------
+           1 | alice johnson | 2025-01-01 21:04:54.964889
+           2 | bob smith     | 2025-01-01 21:04:54.964889
+           3 | charlie brown | 2025-01-01 21:04:54.964889
+           4 | david lee     | 2025-01-01 21:43:22.275095
+(4 rows)
+
+library=# \d borrowed_books;
+                                             Table "public.borrowed_books"
+    Column     |            Type             | Collation | Nullable |                      Default
+---------------+-----------------------------+-----------+----------+---------------------------------------------------
+ borrow_id     | integer                     |           | not null | nextval('borrowed_books_borrow_id_seq'::regclass)
+ borrower_id   | integer                     |           |          |
+ book_id       | integer                     |           |          |
+ borrow_date   | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+ return_date   | timestamp without time zone |           |          |
+ last_borrowed | timestamp without time zone |           |          | CURRENT_TIMESTAMP
+Indexes:
+    "borrowed_books_pkey" PRIMARY KEY, btree (borrow_id)
+Foreign-key constraints:
+    "borrowed_books_book_id_fkey" FOREIGN KEY (book_id) REFERENCES books(book_id)
+    "borrowed_books_borrower_id_fkey" FOREIGN KEY (borrower_id) REFERENCES borrowers(borrower_id)
+Triggers:
+    last_borrowed_trigger AFTER INSERT ON borrowed_books FOR EACH ROW EXECUTE FUNCTION update_last_borrowed()
+
+library=# select * from borrowed_books;
+ borrow_id | borrower_id | book_id |        borrow_date         | return_date |       last_borrowed
+-----------+-------------+---------+----------------------------+-------------+----------------------------
+         1 |           1 |       1 | 2025-01-01 21:09:41.311848 |             | 2025-01-01 21:09:41.311848
